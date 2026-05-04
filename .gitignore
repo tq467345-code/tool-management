@@ -1,0 +1,49 @@
+# Dependencies
+node_modules/
+
+# Database
+*.sqlite
+*.db
+*.sqlite-shm
+*.sqlite-wal
+
+# Logs
+*.log
+npm-debug.log*
+frontend/*.log
+server/*.log
+
+# PID files
+*.pid
+.frontend.pid
+.backend.pid
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build output
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+coverage/
+
+# Misc
+*.bak
+*.tmp
+
+# Test results
+test-results/
+playwright-report/
