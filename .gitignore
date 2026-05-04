@@ -40,7 +40,6 @@ build/
 # Test coverage
 coverage/
 
-# Misc
 *.bak
 *.tmp
 
