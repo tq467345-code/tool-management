@@ -95,7 +95,7 @@ router.get('/export/template', (req, res) => {
     ['Hand Tools']
   ];
 
-  const csvContent = [headers.join(','), ...examples.map(row => `"${row[0]}"`)]..join('\n');
+  const csvContent = [headers.join(','), ...examples.map(row => `"${row[0]}"`)].join('\n');
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename=categories_import_template.csv');
