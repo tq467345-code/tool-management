@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project Overview
+
+Tool Management System - A full-stack application for managing tool borrowing/returning.
+
 ## Quick Start
 
 ```bash
@@ -25,7 +29,6 @@ Default super admin: `admin` / `admin123`
 - `/api/auth` routes are public, others require `authenticateToken` middleware
 - Frontend calls `/api/auth/validate` every 5 seconds to check token validity
 
-
 ### Important Constraint
 **Express Route Order**: Specific paths must come before parameterized routes
 ```javascript
@@ -42,7 +45,6 @@ Affected files: `routes/tools.js`, `routes/users.js`, `routes/categories.js`
 | `user` | Borrow/Return, User Center |
 | `dept_admin` | +User management, Tool management (dept only) |
 | `super_admin` | +Department management, Category management (all data) |
-
 
 ## Database Tables
 
