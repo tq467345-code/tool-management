@@ -9,8 +9,6 @@
 #   ./toolctl.sh reset                         - 重置数据库（清空所有数据，仅保留admin账号）
 # ============================================
 
-set -e
-
 # 颜色定义
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -30,6 +28,34 @@ cd "$PROJECT_ROOT"
 BACKEND_PORT_START=${1:-$BACKEND_PORT}
 
 # ============================================
+# 跨平台检测端口占用函数
+# ============================================
+is_port_in_use() {
+    local port=$1
+    if command -v lsof &> /dev/null; then
+        lsof -i :$port &> /dev/null
+    elif command -v ss &> /dev/null; then
+        ss -tuln 2>/dev/null | grep -q ":$port "
+    elif command -v netstat &> /dev/null; then
+        netstat -tuln 2>/dev/null | grep -q ":$port "
+    else
+        timeout 1 bash -c "echo >/dev/tcp/localhost/$port" 2>/dev/null
+    fi
+    return $?
+}
+
+get_port_pid() {
+    local port=$1
+    if command -v lsof &> /dev/null; then
+        lsof -ti :$port 2>/dev/null | head -1
+    elif command -v ss &> /dev/null; then
+        ss -tulnp 2>/dev/null | grep ":$port " | grep -oP 'pid=\K[0-9]+' | head -1
+    elif command -v netstat &> /dev/null; then
+        netstat -tulnp 2>/dev/null | grep ":$port " | grep -oP 'pid=\K[0-9]+' | head -1
+    fi
+}
+
+# ============================================
 # 检查 Node.js 环境
 # ============================================
 check_node() {
@@ -39,10 +65,10 @@ check_node() {
         exit 1
     fi
 
-    NODE_VERSION=$(node -v | cut -d'v' -f2 | cut -d'.' -f1)
-    if [ "$NODE_VERSION" -lt 18 ]; then
+    NODE_VERSION=$(node -v 2>/dev/null | cut -d'v' -f2 | cut -d'.' -f1)
+    if [ -z "$NODE_VERSION" ] || [ "$NODE_VERSION" -lt 18 ]; then
         echo -e "${RED}错误：Node.js 版本必须 >= 18.0.0${NC}"
-        echo "当前版本：$(node -v)"
+        echo "当前版本：$(node -v 2>/dev/null || echo '未知')${NC}"
         exit 1
     fi
     echo -e "${GREEN}✓ Node.js 版本：$(node -v)${NC}"
@@ -55,38 +81,30 @@ install_deps() {
     echo ""
     echo -e "${YELLOW}正在检查和安装依赖...${NC}"
 
-    local deps_installed=true
-
-    # 创建数据目录
     if [ ! -d "server/data" ]; then
         mkdir -p server/data
     fi
 
-    # 后端依赖
     if [ -f "server/package.json" ]; then
         if [ ! -d "server/node_modules" ]; then
             echo "  正在安装后端依赖..."
-            cd server && npm install --silent 2>&1 | tail -5
+            cd server && npm install 2>&1 | tail -10
             cd ..
-            deps_installed=false
         fi
     fi
 
-    # 前端依赖
     if [ -f "frontend/package.json" ]; then
         if [ ! -d "frontend/node_modules" ]; then
             echo "  正在安装前端依赖..."
-            cd frontend && npm install --silent 2>&1 | tail -5
+            cd frontend && npm install 2>&1 | tail -10
             cd ..
-            deps_installed=false
         fi
     fi
 
-    # 性能测试依赖（可选）
     if [ -f "perf-test/package.json" ]; then
         if [ ! -d "perf-test/node_modules" ]; then
             echo "  正在安装性能测试依赖..."
-            cd perf-test && npm install --silent 2>&1 | tail -3
+            cd perf-test && npm install 2>&1 | tail -5
             cd ..
         fi
     fi
@@ -100,7 +118,6 @@ install_deps() {
 stop_services() {
     echo -e "${YELLOW}正在停止服务...${NC}"
 
-    # 停止后端
     if [ -f "server/.backend.pid" ]; then
         BACKEND_PID=$(cat server/.backend.pid 2>/dev/null || echo "")
         if [ -n "$BACKEND_PID" ] && ps -p $BACKEND_PID &> /dev/null; then
@@ -109,13 +126,11 @@ stop_services() {
         rm -f server/.backend.pid
     fi
 
-    # 强制停止占用后端端口的进程
-    local backend_pid=$(lsof -i :$BACKEND_PORT 2>/dev/null | grep LISTEN | awk '{print $2}' | head -1)
+    local backend_pid=$(get_port_pid $BACKEND_PORT)
     if [ -n "$backend_pid" ]; then
         kill -9 $backend_pid 2>/dev/null || true
     fi
 
-    # 停止前端
     if [ -f "frontend/.frontend.pid" ]; then
         FRONTEND_PID=$(cat frontend/.frontend.pid 2>/dev/null || echo "")
         if [ -n "$FRONTEND_PID" ] && ps -p $FRONTEND_PID &> /dev/null; then
@@ -124,8 +139,7 @@ stop_services() {
         rm -f frontend/.frontend.pid
     fi
 
-    # 强制停止占用前端端口的进程
-    local frontend_pid=$(lsof -i :$FRONTEND_PORT 2>/dev/null | grep LISTEN | awk '{print $2}' | head -1)
+    local frontend_pid=$(get_port_pid $FRONTEND_PORT)
     if [ -n "$frontend_pid" ]; then
         kill -9 $frontend_pid 2>/dev/null || true
     fi
@@ -141,16 +155,13 @@ reset_database() {
     echo ""
     echo -e "${YELLOW}正在重置数据库...${NC}"
 
-    # 停止服务
     stop_services
 
-    # 删除数据库文件
     if [ -f "server/data/database.db" ]; then
         rm -f server/data/database.db
         echo -e "${GREEN}✓ 已删除数据库文件${NC}"
     fi
 
-    # 重新初始化数据库
     echo -e "${YELLOW}正在重新初始化数据库...${NC}"
     cd server
     export PORT=$BACKEND_PORT
@@ -166,6 +177,28 @@ reset_database() {
 }
 
 # ============================================
+# 检查端口可用性
+# ============================================
+check_ports() {
+    if is_port_in_use $FRONTEND_PORT; then
+        echo -e "${RED}错误：前端端口 $FRONTEND_PORT 已被占用${NC}"
+        local pid=$(get_port_pid $FRONTEND_PORT)
+        [ -n "$pid" ] && echo "  占用进程 PID: $pid"
+        return 1
+    fi
+
+    if is_port_in_use $BACKEND_PORT; then
+        echo -e "${RED}错误：后端端口 $BACKEND_PORT 已被占用${NC}"
+        local pid=$(get_port_pid $BACKEND_PORT)
+        [ -n "$pid" ] && echo "  占用进程 PID: $pid"
+        return 1
+    fi
+
+    echo -e "${GREEN}✓ 端口检查通过${NC}"
+    return 0
+}
+
+# ============================================
 # 启动服务
 # ============================================
 start_services() {
@@ -178,10 +211,9 @@ start_services() {
     echo "  后端端口：$BACKEND_PORT"
     echo ""
 
-    # 停止现有服务
     stop_services
+    check_ports || exit 1
 
-    # 启动后端
     echo -e "${YELLOW}正在启动后端服务...${NC}"
     cd server
     export PORT=$BACKEND_PORT
@@ -189,21 +221,24 @@ start_services() {
     BACKEND_PID=$!
     echo $BACKEND_PID > .backend.pid
 
-    # 等待后端启动
-    sleep 2
+    local waited=0
+    while [ $waited -lt 30 ]; do
+        curl -s --connect-timeout 2 http://localhost:$BACKEND_PORT/api/auth/login > /dev/null 2>&1 && break
+        sleep 1
+        waited=$((waited + 1))
+    done
 
-    # 检查后端
-    if curl -s http://localhost:$BACKEND_PORT/api/auth/login > /dev/null 2>&1; then
+    if curl -s --connect-timeout 3 http://localhost:$BACKEND_PORT/api/auth/login > /dev/null 2>&1; then
         echo -e "${GREEN}✓ 后端服务已启动（PID: $BACKEND_PID）${NC}"
     else
         echo -e "${RED}✗ 后端服务启动失败${NC}"
-        cat server.log
+        echo "后端日志："
+        tail -20 server.log 2>/dev/null || echo "无法读取日志"
         exit 1
     fi
 
     cd ..
 
-    # 启动前端
     echo -e "${YELLOW}正在启动前端服务...${NC}"
     cd frontend
     export VITE_PORT=$FRONTEND_PORT
@@ -212,15 +247,19 @@ start_services() {
     FRONTEND_PID=$!
     echo $FRONTEND_PID > .frontend.pid
 
-    # 等待前端启动
-    sleep 3
+    waited=0
+    while [ $waited -lt 60 ]; do
+        curl -s --connect-timeout 2 http://localhost:$FRONTEND_PORT > /dev/null 2>&1 && break
+        sleep 2
+        waited=$((waited + 2))
+    done
 
-    # 检查前端
-    if curl -s http://localhost:$FRONTEND_PORT > /dev/null 2>&1; then
+    if curl -s --connect-timeout 3 http://localhost:$FRONTEND_PORT > /dev/null 2>&1; then
         echo -e "${GREEN}✓ 前端服务已启动（PID: $FRONTEND_PID）${NC}"
     else
         echo -e "${RED}✗ 前端服务启动失败${NC}"
-        cat frontend.log
+        echo "前端日志："
+        tail -20 frontend.log 2>/dev/null || echo "无法读取日志"
         exit 1
     fi
 
@@ -252,15 +291,13 @@ status_services() {
     echo "  服务状态"
     echo "==========================================="
 
-    # 检查后端
-    if curl -s http://localhost:$BACKEND_PORT/api/auth/login > /dev/null 2>&1; then
+    if curl -s --connect-timeout 3 http://localhost:$BACKEND_PORT/api/auth/login > /dev/null 2>&1; then
         echo -e "${GREEN}✓ 后端服务：运行中（端口 $BACKEND_PORT）${NC}"
     else
         echo -e "${RED}✗ 后端服务：未运行（端口 $BACKEND_PORT）${NC}"
     fi
 
-    # 检查前端
-    if curl -s http://localhost:$FRONTEND_PORT > /dev/null 2>&1; then
+    if curl -s --connect-timeout 3 http://localhost:$FRONTEND_PORT > /dev/null 2>&1; then
         echo -e "${GREEN}✓ 前端服务：运行中（端口 $FRONTEND_PORT）${NC}"
     else
         echo -e "${RED}✗ 前端服务：未运行（端口 $FRONTEND_PORT）${NC}"
@@ -278,6 +315,7 @@ case "$1" in
         start_services
         ;;
     stop)
+        check_node
         stop_services
         ;;
     status)
