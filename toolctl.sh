@@ -81,15 +81,6 @@ install_deps() {
         fi
     fi
 
-    # Performance test dependencies (optional)
-    if [ -f "perf-test/package.json" ]; then
-        if [ ! -d "perf-test/node_modules" ]; then
-            echo "  Installing performance test dependencies..."
-            cd perf-test && npm install --silent 2>&1 | tail -3
-            cd ..
-        fi
-    fi
-
     echo -e "${GREEN}✓ Dependency check complete${NC}"
 }
 
@@ -98,7 +89,6 @@ install_deps() {
 # ============================================
 stop_services() {
     echo -e "${YELLOW}Stopping services...${NC}"
-
 
     # Stop backend
     if [ -f "server/.backend.pid" ]; then
@@ -133,7 +123,6 @@ stop_services() {
     sleep 1
     echo -e "${GREEN}✓ Services stopped${NC}"
 }
-
 
 # ============================================
 # Start services
@@ -196,7 +185,6 @@ start_services() {
 
     cd ..
 
-
     echo ""
     echo "=========================================="
     echo -e "${GREEN}  Services started successfully!${NC}"
@@ -222,7 +210,6 @@ status_services() {
     echo "=========================================="
     echo "  Service Status"
     echo "=========================================="
-
 
     # Check backend
     if curl -s http://localhost:$BACKEND_PORT/api/auth/login > /dev/null 2>&1; then
