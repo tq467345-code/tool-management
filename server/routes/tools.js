@@ -16,7 +16,7 @@ router.get('/', (req, res) => {
 
   db.all(query, params, (err, rows) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: '服务器内部错误' });
     }
     res.json(rows);
   });
@@ -30,18 +30,21 @@ router.get('/pending-borrows', (req, res) => {
   let params = [];
 
   if (role === 'member') {
+    // Regular users can only see their own pending requests
     query += ' WHERE pb.user_id = ?';
     params.push(userId);
   } else if (role === 'dept_admin') {
+    // Dept admins can see pending requests in their department
     query += ' WHERE pb.department_id = ? AND pb.status = ?';
     params.push(departmentId, 'pending');
   }
+  // super_admin can see all pending requests
 
   query += ' ORDER BY pb.created_at DESC';
 
   db.all(query, params, (err, rows) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: '服务器内部错误' });
     }
 
     const result = rows.map(row => ({
@@ -76,11 +79,11 @@ router.get('/export', (req, res) => {
 
   db.all(query, params, (err, rows) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: '服务器内部错误' });
     }
 
     if (!rows || rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'No data to export' });
+      return res.status(404).json({ success: false, message: '无数据可导出' });
     }
 
     const headers = ['Tool Name', 'Category', 'Department', 'Total', 'Available', 'Location', 'Description'];
@@ -108,7 +111,7 @@ router.post('/import', (req, res) => {
   const importedTools = req.body;
 
   if (!Array.isArray(importedTools)) {
-    return res.status(400).json({ success: false, message: 'Import data must be array format' });
+    return res.status(400).json({ success: false, message: '导入数据必须为数组格式' });
   }
 
   const successCount = { value: 0 };
@@ -119,7 +122,7 @@ router.post('/import', (req, res) => {
     if (index >= importedTools.length) {
       return res.json({
         success: true,
-        message: `Import complete: ${successCount.value} success, ${failCount.value} failed`,
+        message: `导入完成：${successCount.value} 成功，${failCount.value} 失败`,
         successCount: successCount.value,
         failCount: failCount.value,
         errors
@@ -130,14 +133,14 @@ router.post('/import', (req, res) => {
 
     if (!toolData['Tool Name'] || !toolData['Category'] || !toolData['Total']) {
       failCount.value++;
-      errors.push(`Row ${index + 1}: Tool Name, Category, Total are required`);
+      errors.push(`第 ${index + 1} 行：工具名称、类别、总数量为必填项`);
       return processTools(index + 1);
     }
 
     const total = parseInt(toolData['Total']);
     if (isNaN(total) || total <= 0) {
       failCount.value++;
-      errors.push(`Row ${index + 1}: Total must be a positive number`);
+      errors.push(`第 ${index + 1} 行：总数量必须为正数`);
       return processTools(index + 1);
     }
 
@@ -152,7 +155,7 @@ router.post('/import', (req, res) => {
 
     if (!deptId) {
       failCount.value++;
-      errors.push(`Row ${index + 1}: Must select a department`);
+      errors.push(`第 ${index + 1} 行：必须选择班组`);
       return processTools(index + 1);
     }
 
@@ -164,7 +167,7 @@ router.post('/import', (req, res) => {
       function(err) {
         if (err) {
           failCount.value++;
-          errors.push(`Row ${index + 1}: Import failed`);
+          errors.push(`第 ${index + 1} 行：导入失败`);
         } else {
           successCount.value++;
         }
@@ -193,11 +196,11 @@ router.get('/export/template', (req, res) => {
 router.get('/:id', (req, res) => {
   db.get('SELECT t.*, d.name as departmentName FROM tools t LEFT JOIN departments d ON t.department_id = d.id WHERE t.id = ?', [req.params.id], (err, row) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: '服务器内部错误' });
     }
 
     if (!row) {
-      return res.status(404).json({ success: false, message: 'Tool does not exist' });
+      return res.status(404).json({ success: false, message: '工具不存在' });
     }
 
     res.json(row);
@@ -206,21 +209,21 @@ router.get('/:id', (req, res) => {
 
 router.post('/', (req, res) => {
   const { name, category, departmentId, total, location, description } = req.body;
-
+  
   if (!name || !category || !total) {
-    return res.status(400).json({ success: false, message: 'Required fields cannot be empty' });
+    return res.status(400).json({ success: false, message: '必填字段不能为空' });
   }
 
   const totalNum = parseInt(total);
   if (isNaN(totalNum) || totalNum <= 0) {
-    return res.status(400).json({ success: false, message: 'Total must be greater than 0' });
+    return res.status(400).json({ success: false, message: '总数量必须大于0' });
   }
 
   const id = 't' + Date.now();
   const deptId = req.user.role === 'super_admin' ? departmentId : req.user.departmentId;
 
   if (!deptId) {
-    return res.status(400).json({ success: false, message: 'Must select a department' });
+    return res.status(400).json({ success: false, message: '必须选择班组' });
   }
 
   db.run(
@@ -228,16 +231,16 @@ router.post('/', (req, res) => {
     [id, name, category, deptId, totalNum, totalNum, location || '', description || ''],
     function(err) {
       if (err) {
-        return res.status(500).json({ success: false, message: 'Creation failed' });
+        return res.status(500).json({ success: false, message: '创建失败' });
       }
 
       db.get('SELECT t.*, d.name as departmentName FROM tools t LEFT JOIN departments d ON t.department_id = d.id WHERE t.id = ?', [id], (err, row) => {
         if (err) {
-          return res.status(500).json({ success: false, message: 'Query failed' });
+          return res.status(500).json({ success: false, message: '查询失败' });
         }
         res.json({
           success: true,
-          message: 'Created successfully',
+          message: '创建成功',
           data: row
         });
       });
@@ -250,11 +253,11 @@ router.put('/:id', (req, res) => {
 
   db.get('SELECT * FROM tools WHERE id = ?', [req.params.id], (err, tool) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: '服务器内部错误' });
     }
 
     if (!tool) {
-      return res.status(404).json({ success: false, message: 'Tool does not exist' });
+      return res.status(404).json({ success: false, message: '工具不存在' });
     }
 
     let updates = [];
@@ -271,7 +274,7 @@ router.put('/:id', (req, res) => {
     if (total !== undefined) {
       const totalNum = parseInt(total);
       if (isNaN(totalNum) || totalNum <= 0) {
-        return res.status(400).json({ success: false, message: 'Total must be greater than 0' });
+        return res.status(400).json({ success: false, message: '总数量必须大于0' });
       }
       updates.push('total = ?');
       params.push(totalNum);
@@ -297,7 +300,7 @@ router.put('/:id', (req, res) => {
     }
 
     if (updates.length === 0) {
-      return res.status(400).json({ success: false, message: 'No fields to update' });
+      return res.status(400).json({ success: false, message: '没有要更新的字段' });
     }
 
     params.push(req.params.id);
@@ -335,17 +338,17 @@ router.put('/:id', (req, res) => {
       .then(() => {
         db.get('SELECT t.*, d.name as departmentName FROM tools t LEFT JOIN departments d ON t.department_id = d.id WHERE t.id = ?', [req.params.id], (err, row) => {
           if (err) {
-            return res.status(500).json({ success: false, message: 'Query failed' });
+            return res.status(500).json({ success: false, message: '查询失败' });
           }
           res.json({
             success: true,
-            message: 'Updated successfully',
+            message: '更新成功',
             data: row
           });
         });
       })
       .catch((err) => {
-        res.status(500).json({ success: false, message: 'Update failed' });
+        res.status(500).json({ success: false, message: '更新失败' });
       });
   });
 });
@@ -353,34 +356,37 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   db.get('SELECT * FROM tools WHERE id = ?', [req.params.id], (err, tool) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: '服务器内部错误' });
     }
 
     if (!tool) {
-      return res.status(404).json({ success: false, message: 'Tool does not exist' });
+      return res.status(404).json({ success: false, message: '工具不存在' });
     }
 
+    // Check if tool has unreturned borrow records
     db.get('SELECT COUNT(*) as count FROM borrow_records WHERE tool_id = ? AND status = ?', [req.params.id, 'borrowed'], (err, row) => {
       if (err) {
-        return res.status(500).json({ success: false, message: 'Internal server error' });
+        return res.status(500).json({ success: false, message: '服务器内部错误' });
       }
       if (row && row.count > 0) {
-        return res.status(400).json({ success: false, message: 'Cannot delete tool with unreturned borrow records' });
+        return res.status(400).json({ success: false, message: '无法删除工具，存在未归还的借用记录' });
       }
 
+      // Check if tool has pending borrow requests
       db.get('SELECT COUNT(*) as count FROM pending_borrows WHERE tool_id = ? AND status = ?', [req.params.id, 'pending'], (err, row) => {
         if (err) {
-          return res.status(500).json({ success: false, message: 'Internal server error' });
+          return res.status(500).json({ success: false, message: '服务器内部错误' });
         }
         if (row && row.count > 0) {
-          return res.status(400).json({ success: false, message: 'Cannot delete tool with pending borrow requests' });
+          return res.status(400).json({ success: false, message: '无法删除工具，存在待审批的借用申请' });
         }
 
+        // Safe to delete
         db.run('DELETE FROM tools WHERE id = ?', [req.params.id], function(err) {
           if (err) {
-            return res.status(500).json({ success: false, message: 'Delete failed' });
+            return res.status(500).json({ success: false, message: '删除失败' });
           }
-          res.json({ success: true, message: 'Deleted successfully' });
+          res.json({ success: true, message: '删除成功' });
         });
       });
     });
@@ -392,29 +398,30 @@ router.post('/:id/borrow', (req, res) => {
   const { role } = req.user;
 
   if (!userId) {
-    return res.status(400).json({ success: false, message: 'User ID cannot be empty' });
+    return res.status(400).json({ success: false, message: '用户ID不能为空' });
   }
 
   const borrowQty = parseInt(quantity) || 1;
   if (borrowQty <= 0) {
-    return res.status(400).json({ success: false, message: 'Borrow quantity must be greater than 0' });
+    return res.status(400).json({ success: false, message: '借用数量必须大于0' });
   }
 
   db.get('SELECT * FROM tools WHERE id = ?', [req.params.id], async (err, tool) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: '服务器内部错误' });
     }
 
     if (!tool) {
-      return res.status(404).json({ success: false, message: 'Tool does not exist' });
+      return res.status(404).json({ success: false, message: '工具不存在' });
     }
 
     if (tool.available < borrowQty) {
-      return res.status(400).json({ success: false, message: 'Insufficient tool inventory' });
+      return res.status(400).json({ success: false, message: '工具库存不足' });
     }
 
     const now = new Date();
 
+    // Admins (super_admin, dept_admin) can borrow directly without approval
     if (role === 'super_admin' || role === 'dept_admin') {
       const newAvailable = tool.available - borrowQty;
       const id = 'b' + Date.now();
@@ -430,14 +437,15 @@ router.post('/:id/borrow', (req, res) => {
 
         db.get('SELECT * FROM borrow_records WHERE id = ?', [id], (err, record) => {
           if (err) {
-            return res.status(500).json({ success: false, message: 'Internal server error' });
+            return res.status(500).json({ success: false, message: '服务器内部错误' });
           }
-          res.json({ success: true, message: 'Borrow successful', data: record });
+          res.json({ success: true, message: '借用成功', data: record });
         });
       } catch (err) {
-        return res.status(500).json({ success: false, message: 'Borrow failed, please retry' });
+        return res.status(500).json({ success: false, message: '借用失败，请重试' });
       }
     } else {
+      // Regular users need approval
       const id = 'p' + Date.now();
 
       try {
@@ -446,11 +454,11 @@ router.post('/:id/borrow', (req, res) => {
           [id, tool.id, tool.name, tool.category, userId, borrowQty, borrowReason || '', tool.department_id, 'pending', now.toISOString(), now.toISOString()],
           function(err) {
             if (err) {
-              return res.status(500).json({ success: false, message: 'Failed to submit request, please retry' });
+              return res.status(500).json({ success: false, message: '提交申请失败，请重试' });
             }
             res.json({
               success: true,
-              message: 'Borrow request submitted, please wait for approval',
+              message: '借用申请已提交，请等待审批',
               status: 'pending',
               data: {
                 id,
@@ -467,48 +475,51 @@ router.post('/:id/borrow', (req, res) => {
           }
         );
       } catch (err) {
-        return res.status(500).json({ success: false, message: 'Failed to submit request, please retry' });
+        return res.status(500).json({ success: false, message: '提交申请失败，请重试' });
       }
     }
   });
 });
 
+// Approve a pending borrow request
 router.post('/pending-borrows/:id/approve', (req, res) => {
   const { approvingUserId } = req.body;
   const { role, departmentId } = req.user;
 
   db.get('SELECT * FROM pending_borrows WHERE id = ?', [req.params.id], async (err, pending) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: '服务器内部错误' });
     }
 
     if (!pending) {
-      return res.status(404).json({ success: false, message: 'Request does not exist' });
+      return res.status(404).json({ success: false, message: '申请不存在' });
     }
 
     if (pending.status !== 'pending') {
-      return res.status(400).json({ success: false, message: 'This request has been processed' });
+      return res.status(400).json({ success: false, message: '该申请已被处理' });
     }
 
+    // Permission check: only dept_admin and super_admin can approve
     if (role === 'member') {
-      return res.status(403).json({ success: false, message: 'Regular users cannot approve borrow requests' });
+      return res.status(403).json({ success: false, message: '普通用户不能批准借用申请' });
     }
 
+    // Dept admin can only approve requests in their department
     if (role === 'dept_admin' && pending.department_id !== departmentId) {
-      return res.status(403).json({ success: false, message: 'Cannot approve requests from other departments' });
+      return res.status(403).json({ success: false, message: '无法批准其他班组的申请' });
     }
 
     db.get('SELECT * FROM tools WHERE id = ?', [pending.tool_id], async (err, tool) => {
       if (err) {
-        return res.status(500).json({ success: false, message: 'Internal server error' });
+        return res.status(500).json({ success: false, message: '服务器内部错误' });
       }
 
       if (!tool) {
-        return res.status(404).json({ success: false, message: 'Tool does not exist' });
+        return res.status(404).json({ success: false, message: '工具不存在' });
       }
 
       if (tool.available < pending.quantity) {
-        return res.status(400).json({ success: false, message: 'Insufficient tool inventory, cannot approve' });
+        return res.status(400).json({ success: false, message: '工具库存不足，无法批准' });
       }
 
       const now = new Date();
@@ -527,39 +538,40 @@ router.post('/pending-borrows/:id/approve', (req, res) => {
 
         db.get('SELECT * FROM borrow_records WHERE id = ?', [borrowId], (err, record) => {
           if (err) {
-            return res.status(500).json({ success: false, message: 'Internal server error' });
+            return res.status(500).json({ success: false, message: '服务器内部错误' });
           }
-          res.json({ success: true, message: 'Approval successful', data: record });
+          res.json({ success: true, message: '审批成功', data: record });
         });
       } catch (err) {
-        return res.status(500).json({ success: false, message: 'Approval failed, please retry' });
+        return res.status(500).json({ success: false, message: '审批失败，请重试' });
       }
     });
   });
 });
 
+// Reject a pending borrow request
 router.post('/pending-borrows/:id/reject', (req, res) => {
   const { role, departmentId } = req.user;
 
-  db.get('SELECT * FROM pending_borrows WHERE id = ?', [req.params.id], (err, pending) => {
+  db.get('SELECT * FROM pending_borrows WHERE id = ?', [req.params.id], async (err, pending) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: '服务器内部错误' });
     }
 
     if (!pending) {
-      return res.status(404).json({ success: false, message: 'Request does not exist' });
+      return res.status(404).json({ success: false, message: '申请不存在' });
     }
 
     if (pending.status !== 'pending') {
-      return res.status(400).json({ success: false, message: 'This request has been processed' });
+      return res.status(400).json({ success: false, message: '该申请已被处理' });
     }
 
     if (role === 'member') {
-      return res.status(403).json({ success: false, message: 'Regular users cannot reject borrow requests' });
+      return res.status(403).json({ success: false, message: '普通用户不能拒绝借用申请' });
     }
 
     if (role === 'dept_admin' && pending.department_id !== departmentId) {
-      return res.status(403).json({ success: false, message: 'Cannot reject requests from other departments' });
+      return res.status(403).json({ success: false, message: '无法拒绝其他班组的申请' });
     }
 
     const now = new Date();
@@ -569,32 +581,34 @@ router.post('/pending-borrows/:id/reject', (req, res) => {
       ['rejected', now.toISOString(), req.params.id],
       function(err) {
         if (err) {
-          return res.status(500).json({ success: false, message: 'Operation failed' });
+          return res.status(500).json({ success: false, message: '操作失败' });
         }
-        res.json({ success: true, message: 'Borrow request rejected' });
+        res.json({ success: true, message: '借用申请已拒绝' });
       }
     );
   });
 });
 
+// Cancel a pending borrow request (for regular users)
 router.delete('/pending-borrows/:id', (req, res) => {
   const { userId, role } = req.user;
 
   db.get('SELECT * FROM pending_borrows WHERE id = ?', [req.params.id], (err, pending) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: '服务器内部错误' });
     }
 
     if (!pending) {
-      return res.status(404).json({ success: false, message: 'Request does not exist' });
+      return res.status(404).json({ success: false, message: '申请不存在' });
     }
 
+    // Only the requester or admins can cancel
     if (role === 'member' && pending.user_id !== userId) {
-      return res.status(403).json({ success: false, message: 'Cannot cancel other users borrow requests' });
+      return res.status(403).json({ success: false, message: '无法取消其他用户的借用申请' });
     }
 
     if (pending.status !== 'pending') {
-      return res.status(400).json({ success: false, message: 'This request has been processed, cannot cancel' });
+      return res.status(400).json({ success: false, message: '该申请已被处理，无法取消' });
     }
 
     db.run(
@@ -602,9 +616,9 @@ router.delete('/pending-borrows/:id', (req, res) => {
       ['cancelled', new Date().toISOString(), req.params.id],
       function(err) {
         if (err) {
-          return res.status(500).json({ success: false, message: 'Cancel failed' });
+          return res.status(500).json({ success: false, message: '取消失败' });
         }
-        res.json({ success: true, message: 'Borrow request cancelled' });
+        res.json({ success: true, message: '借用申请已取消' });
       }
     );
   });
@@ -613,24 +627,24 @@ router.delete('/pending-borrows/:id', (req, res) => {
 router.post('/:id/return', (req, res) => {
   db.get('SELECT * FROM tools WHERE id = ?', [req.params.id], async (err, tool) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Internal server error' });
+      return res.status(500).json({ success: false, message: '服务器内部错误' });
     }
 
     if (!tool) {
-      return res.status(404).json({ success: false, message: 'Tool does not exist' });
+      return res.status(404).json({ success: false, message: '工具不存在' });
     }
 
     if (tool.available >= tool.total) {
-      return res.status(400).json({ success: false, message: 'All tools have been returned' });
+      return res.status(400).json({ success: false, message: '所有工具已归还' });
     }
 
     db.get('SELECT * FROM borrow_records WHERE tool_id = ? AND status = "borrowed" ORDER BY borrow_date ASC, borrow_time ASC LIMIT 1', [req.params.id], async (err, record) => {
       if (err) {
-        return res.status(500).json({ success: false, message: 'Internal server error' });
+        return res.status(500).json({ success: false, message: '服务器内部错误' });
       }
 
       if (!record) {
-        return res.status(404).json({ success: false, message: 'No borrow record found' });
+        return res.status(404).json({ success: false, message: '未找到借用记录' });
       }
 
       const newAvailable = tool.available + 1;
@@ -639,7 +653,7 @@ router.post('/:id/return', (req, res) => {
       try {
         await runTransaction([
           { sql: 'UPDATE tools SET available = ? WHERE id = ? AND available < total', params: [newAvailable, req.params.id] },
-          {
+          { 
             sql: 'UPDATE borrow_records SET status = ?, return_date = ?, return_time = ? WHERE id = ?',
             params: ['returned', now.toISOString().split('T')[0], now.toTimeString().slice(0, 8), record.id]
           }
@@ -647,12 +661,12 @@ router.post('/:id/return', (req, res) => {
 
         db.get('SELECT * FROM borrow_records WHERE id = ?', [record.id], (err, updatedRecord) => {
           if (err) {
-            return res.status(500).json({ success: false, message: 'Internal server error' });
+            return res.status(500).json({ success: false, message: '服务器内部错误' });
           }
-          res.json({ success: true, message: 'Return successful', data: updatedRecord });
+          res.json({ success: true, message: '归还成功', data: updatedRecord });
         });
       } catch (err) {
-        return res.status(500).json({ success: false, message: 'Return failed, please retry' });
+        return res.status(500).json({ success: false, message: '归还失败，请重试' });
       }
     });
   });
