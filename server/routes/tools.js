@@ -184,7 +184,7 @@ router.get('/export/template', (req, res) => {
     ['Drill', 'Power Tools', 'Maintenance Team 2', '3', 'Warehouse B', 'Cordless drill']
   ];
 
-  const csvContent = [headers.join(','), ...examples.map(row => `"${row.join('","')}"`)]..join('\n');
+  const csvContent = [headers.join(','), ...examples.map(row => `"${row.join('","')}"`)].join('\n');
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename=tools_import_template.csv');

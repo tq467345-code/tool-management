@@ -169,7 +169,7 @@ router.get('/export/template', (req, res) => {
     ['006', 'User Six', 'Dept Admin', 'Maintenance Team 3']
   ];
 
-  const csvContent = [headers.join(','), ...examples.map(row => `"${row.join('","')}"`)]..join('\n');
+  const csvContent = [headers.join(','), ...examples.map(row => `"${row.join('","')}"`)].join('\n');
 
   res.setHeader('Content-Type', 'text/csv; charset=utf-8');
   res.setHeader('Content-Disposition', 'attachment; filename=users_import_template.csv');
