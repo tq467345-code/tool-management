@@ -6,7 +6,7 @@ const router = express.Router();
 router.get('/', (req, res) => {
   db.all('SELECT * FROM tool_categories', (err, rows) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Database query failed' });
+      return res.status(500).json({ success: false, message: '数据库查询失败' });
     }
     res.json(rows);
   });
@@ -15,11 +15,11 @@ router.get('/', (req, res) => {
 router.get('/export', (req, res) => {
   db.all('SELECT name FROM tool_categories', (err, rows) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Database query failed' });
+      return res.status(500).json({ success: false, message: '数据库查询失败' });
     }
 
     if (!rows || rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'No data to export' });
+      return res.status(404).json({ success: false, message: '无数据可导出' });
     }
 
     const headers = ['Category Name'];
@@ -38,7 +38,7 @@ router.post('/import', (req, res) => {
   const importedCategories = req.body;
 
   if (!Array.isArray(importedCategories)) {
-    return res.status(400).json({ success: false, message: 'Import data must be array format' });
+    return res.status(400).json({ success: false, message: '导入数据必须为数组格式' });
   }
 
   let successCount = 0;
@@ -49,7 +49,7 @@ router.post('/import', (req, res) => {
     try {
       if (!catData['Category Name']) {
         failCount++;
-        errors.push(`Row ${index + 1}: Category Name is required`);
+        errors.push(`第 ${index + 1} 行：类别名称为必填项`);
         return;
       }
 
@@ -61,25 +61,25 @@ router.post('/import', (req, res) => {
         function(err) {
           if (err) {
             failCount++;
-            errors.push(`Row ${index + 1}: Import failed - ${err.message}`);
+            errors.push(`第 ${index + 1} 行：导入失败 - ${err.message}`);
           } else if (this.changes > 0) {
             successCount++;
           } else {
             failCount++;
-            errors.push(`Row ${index + 1}: Category already exists`);
+            errors.push(`第 ${index + 1} 行：类别已存在`);
           }
         }
       );
     } catch (error) {
       failCount++;
-      errors.push(`Row ${index + 1}: Import failed - ${error.message}`);
+      errors.push(`第 ${index + 1} 行：导入失败 - ${error.message}`);
     }
   });
 
   setTimeout(() => {
     res.json({
       success: true,
-      message: `Import complete: ${successCount} success, ${failCount} failed`,
+      message: `导入完成：${successCount} 成功，${failCount} 失败`,
       successCount,
       failCount,
       errors
@@ -102,14 +102,14 @@ router.get('/export/template', (req, res) => {
   res.send('\uFEFF' + csvContent);
 });
 
-router.get('/:id', (req, res) => {
+router.get('/:id', (req,res) => {
   db.get('SELECT * FROM tool_categories WHERE id = ?', [req.params.id], (err, row) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Database query failed' });
+      return res.status(500).json({ success: false, message: '数据库查询失败' });
     }
 
     if (!row) {
-      return res.status(404).json({ success: false, message: 'Category does not exist' });
+      return res.status(404).json({ success: false, message: '类别不存在' });
     }
 
     res.json(row);
@@ -118,9 +118,9 @@ router.get('/:id', (req, res) => {
 
 router.post('/', (req, res) => {
   const { name } = req.body;
-
+  
   if (!name) {
-    return res.status(400).json({ success: false, message: 'Category name cannot be empty' });
+    return res.status(400).json({ success: false, message: '类别名称不能为空' });
   }
 
   const id = 'c' + Date.now();
@@ -130,12 +130,12 @@ router.post('/', (req, res) => {
     [id, name],
     function(err) {
       if (err) {
-        return res.status(500).json({ success: false, message: 'Insert failed' });
+        return res.status(500).json({ success: false, message: '插入失败' });
       }
 
       res.json({
         success: true,
-        message: 'Created successfully',
+        message: '创建成功',
         data: { id, name }
       });
     }
@@ -146,21 +146,21 @@ router.put('/:id', (req, res) => {
   const { name } = req.body;
 
   if (!name) {
-    return res.status(400).json({ success: false, message: 'Category name cannot be empty' });
+    return res.status(400).json({ success: false, message: '类别名称不能为空' });
   }
 
   db.run('UPDATE tool_categories SET name = ? WHERE id = ?', [name, req.params.id], function(err) {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Update failed' });
+      return res.status(500).json({ success: false, message: '更新失败' });
     }
 
     if (this.changes === 0) {
-      return res.status(404).json({ success: false, message: 'Category does not exist' });
+      return res.status(404).json({ success: false, message: '类别不存在' });
     }
 
     res.json({
       success: true,
-      message: 'Updated successfully',
+      message: '更新成功',
       data: { id: req.params.id, name }
     });
   });
@@ -169,14 +169,14 @@ router.put('/:id', (req, res) => {
 router.delete('/:id', (req, res) => {
   db.run('DELETE FROM tool_categories WHERE id = ?', [req.params.id], function(err) {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Delete failed' });
+      return res.status(500).json({ success: false, message: '删除失败' });
     }
 
     if (this.changes === 0) {
-      return res.status(404).json({ success: false, message: 'Category does not exist' });
+      return res.status(404).json({ success: false, message: '类别不存在' });
     }
 
-    res.json({ success: true, message: 'Deleted successfully' });
+    res.json({ success: true, message: '删除成功' });
   });
 });
 

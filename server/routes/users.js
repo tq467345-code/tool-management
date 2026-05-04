@@ -17,7 +17,7 @@ router.get('/', (req, res) => {
 
   db.all(query, params, (err, rows) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Database query failed' });
+      return res.status(500).json({ success: false, message: '数据库查询失败' });
     }
 
     const result = rows.map(row => ({
@@ -47,11 +47,11 @@ router.get('/export', (req, res) => {
 
   db.all(query, params, (err, rows) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Database query failed' });
+      return res.status(500).json({ success: false, message: '数据库查询失败' });
     }
 
     if (!rows || rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'No data to export' });
+      return res.status(404).json({ success: false, message: '无数据可导出' });
     }
 
     const headers = ['Username', 'Name', 'Role', 'Department'];
@@ -76,7 +76,7 @@ router.post('/import', (req, res) => {
   const importedUsers = req.body;
 
   if (!Array.isArray(importedUsers)) {
-    return res.status(400).json({ success: false, message: 'Import data must be array format' });
+    return res.status(400).json({ success: false, message: '导入数据必须为数组格式' });
   }
 
   let successCount = 0;
@@ -87,7 +87,7 @@ router.post('/import', (req, res) => {
     try {
       if (!userData['Username'] || !userData['Name'] || !userData['Role']) {
         failCount++;
-        errors.push(`Row ${index + 1}: Username, Name, Role are required`);
+        errors.push(`第 ${index + 1} 行：账号、姓名、角色为必填项`);
         return;
       }
 
@@ -100,13 +100,13 @@ router.post('/import', (req, res) => {
 
       if (!userRole) {
         failCount++;
-        errors.push(`Row ${index + 1}: Role must be Super Admin, Dept Admin, or Regular User`);
+        errors.push(`第 ${index + 1} 行：角色必须是系统超级管理员、班组管理员或普通用户`);
         return;
       }
 
       if (userRole === 'super_admin' && role !== 'super_admin') {
         failCount++;
-        errors.push(`Row ${index + 1}: Only super admin can create super admin`);
+        errors.push(`第 ${index + 1} 行：只有超级管理员才能创建超级管理员`);
         return;
       }
 
@@ -125,7 +125,7 @@ router.post('/import', (req, res) => {
       bcrypt.hash(defaultPassword, 10, (err, hash) => {
         if (err) {
           failCount++;
-          errors.push(`Row ${index + 1}: Encryption failed`);
+          errors.push(`第 ${index + 1} 行：加密失败`);
           return;
         }
 
@@ -135,26 +135,26 @@ router.post('/import', (req, res) => {
           function(err) {
             if (err) {
               failCount++;
-              errors.push(`Row ${index + 1}: Import failed - ${err.message}`);
+              errors.push(`第 ${index + 1} 行：导入失败 - ${err.message}`);
             } else if (this.changes > 0) {
               successCount++;
             } else {
               failCount++;
-              errors.push(`Row ${index + 1}: Username already exists`);
+              errors.push(`第 ${index + 1} 行：账号已存在`);
             }
           }
         );
       });
     } catch (error) {
       failCount++;
-      errors.push(`Row ${index + 1}: Import failed - ${error.message}`);
+      errors.push(`第 ${index + 1} 行：导入失败 - ${error.message}`);
     }
   });
 
   setTimeout(() => {
     res.json({
       success: true,
-      message: `Import complete: ${successCount} success, ${failCount} failed`,
+      message: `导入完成：${successCount} 成功，${failCount} 失败`,
       successCount,
       failCount,
       errors
@@ -179,11 +179,11 @@ router.get('/export/template', (req, res) => {
 router.get('/:id', (req, res) => {
   db.get('SELECT u.id, u.username, u.real_name, u.role, d.name as departmentName, u.department_id FROM users u LEFT JOIN departments d ON u.department_id = d.id WHERE u.id = ?', [req.params.id], (err, row) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Database query failed' });
+      return res.status(500).json({ success: false, message: '数据库查询失败' });
     }
 
     if (!row) {
-      return res.status(404).json({ success: false, message: 'User does not exist' });
+      return res.status(404).json({ success: false, message: '用户不存在' });
     }
 
     res.json({
@@ -202,7 +202,7 @@ router.post('/', (req, res) => {
   const { username, realName, role, departmentId } = req.body;
 
   if (!username || !realName || !role) {
-    return res.status(400).json({ success: false, message: 'Required fields cannot be empty' });
+    return res.status(400).json({ success: false, message: '必填字段不能为空' });
   }
 
   const id = username;
@@ -212,12 +212,12 @@ router.post('/', (req, res) => {
   if (role === 'super_admin') {
     deptId = departmentId || null;
   } else if (!deptId) {
-    return res.status(400).json({ success: false, message: 'Dept Admin and Regular User must select a department' });
+    return res.status(400).json({ success: false, message: '班组管理员和普通用户必须选择班组' });
   }
 
   bcrypt.hash(defaultPassword, 10, (err, hash) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Encryption failed' });
+      return res.status(500).json({ success: false, message: '加密失败' });
     }
 
     db.run(
@@ -225,16 +225,16 @@ router.post('/', (req, res) => {
       [id, username, hash, realName, deptId, role],
       function(err) {
         if (err) {
-          return res.status(500).json({ success: false, message: 'Insert failed: ' + err.message });
+          return res.status(500).json({ success: false, message: '插入失败：' + err.message });
         }
 
         db.get('SELECT u.id, u.username, u.real_name, u.role, d.name as departmentName FROM users u LEFT JOIN departments d ON u.department_id = d.id WHERE u.id = ?', [id], (err, row) => {
           if (err) {
-            return res.status(500).json({ success: false, message: 'Query failed' });
+            return res.status(500).json({ success: false, message: '查询失败' });
           }
           res.json({
             success: true,
-            message: 'Created successfully, initial password is 123456',
+            message: '创建成功，默认密码为123456',
             data: {
               id: row.id,
               username: row.username,
@@ -257,30 +257,30 @@ router.put('/:id', (req, res) => {
   const targetUserId = req.params.id;
 
   if (targetUserId === req.user.userId && role) {
-    return res.status(400).json({ success: false, message: 'Cannot modify your own role' });
+    return res.status(400).json({ success: false, message: '不能修改自己的角色' });
   }
 
   db.get('SELECT * FROM users WHERE id = ?', [targetUserId], (err, user) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Database query failed' });
+      return res.status(500).json({ success: false, message: '数据库查询失败' });
     }
 
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User does not exist' });
+      return res.status(404).json({ success: false, message: '用户不存在' });
     }
 
     if (role && role !== user.role) {
       if (currentUserRole !== 'super_admin') {
-        return res.status(403).json({ success: false, message: 'Only super admin can modify user roles' });
+        return res.status(403).json({ success: false, message: '只有超级管理员才能修改用户角色' });
       }
       if (user.role === 'super_admin') {
-        return res.status(403).json({ success: false, message: 'Cannot modify super admin role' });
+        return res.status(403).json({ success: false, message: '不能修改超级管理员的角色' });
       }
     }
 
     if (departmentId !== undefined && departmentId !== user.department_id) {
       if (currentUserRole !== 'super_admin') {
-        return res.status(403).json({ success: false, message: 'Only super admin can modify user departments' });
+        return res.status(403).json({ success: false, message: '只有超级管理员才能修改用户班组' });
       }
     }
 
@@ -296,7 +296,7 @@ router.put('/:id', (req, res) => {
       params.push(role);
 
       if (role !== 'super_admin' && !departmentId && !user.department_id) {
-        return res.status(400).json({ success: false, message: 'Dept Admin and Regular User must select a department' });
+        return res.status(400).json({ success: false, message: '班组管理员和普通用户必须选择班组' });
       }
     }
     if (currentUserRole === 'super_admin') {
@@ -308,16 +308,16 @@ router.put('/:id', (req, res) => {
 
     db.run(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`, params, function(err) {
       if (err) {
-        return res.status(500).json({ success: false, message: 'Update failed' });
+        return res.status(500).json({ success: false, message: '更新失败' });
       }
 
       db.get('SELECT u.id, u.username, u.real_name, u.role, d.name as departmentName FROM users u LEFT JOIN departments d ON u.department_id = d.id WHERE u.id = ?', [targetUserId], (err, row) => {
         if (err) {
-          return res.status(500).json({ success: false, message: 'Query failed' });
+          return res.status(500).json({ success: false, message: '查询失败' });
         }
         res.json({
           success: true,
-          message: 'Updated successfully',
+          message: '更新成功',
           data: {
             id: row.id,
             username: row.username,
@@ -338,45 +338,45 @@ router.delete('/:id', (req, res) => {
   const currentUserDeptId = req.user.departmentId;
 
   if (targetUserId === req.user.userId) {
-    return res.status(400).json({ success: false, message: 'Cannot delete your own account' });
+    return res.status(400).json({ success: false, message: '不能删除自己的账号' });
   }
 
   db.get('SELECT * FROM users WHERE id = ?', [targetUserId], (err, user) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Database query failed' });
+      return res.status(500).json({ success: false, message: '数据库查询失败' });
     }
 
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User does not exist' });
+      return res.status(404).json({ success: false, message: '用户不存在' });
     }
 
     if (targetUserId === 'admin') {
-      return res.status(403).json({ success: false, message: 'Cannot delete admin account' });
+      return res.status(403).json({ success: false, message: '不能删除管理员账号' });
     }
 
     if (currentUserRole === 'user') {
-      return res.status(403).json({ success: false, message: 'Regular users cannot delete accounts' });
+      return res.status(403).json({ success: false, message: '普通用户不能删除账号' });
     }
 
     if (currentUserRole === 'dept_admin') {
       if (user.role !== 'user') {
-        return res.status(403).json({ success: false, message: 'Dept admin can only delete regular users' });
+        return res.status(403).json({ success: false, message: '班组管理员只能删除普通用户' });
       }
       if (user.department_id !== currentUserDeptId) {
-        return res.status(403).json({ success: false, message: 'Can only delete users in your department' });
+        return res.status(403).json({ success: false, message: '只能删除本班组的用户' });
       }
     }
 
     db.run('DELETE FROM users WHERE id = ?', [targetUserId], function(err) {
       if (err) {
-        return res.status(500).json({ success: false, message: 'Delete failed' });
+        return res.status(500).json({ success: false, message: '删除失败' });
       }
 
       if (this.changes === 0) {
-        return res.status(404).json({ success: false, message: 'User does not exist' });
+        return res.status(404).json({ success: false, message: '用户不存在' });
       }
 
-      res.json({ success: true, message: 'Deleted successfully' });
+      res.json({ success: true, message: '删除成功' });
     });
   });
 });
@@ -390,38 +390,38 @@ router.post('/:id/reset-password', (req, res) => {
   if (currentUserRole === 'dept_admin') {
     db.get('SELECT * FROM users WHERE id = ?', [targetUserId], (err, targetUser) => {
       if (err) {
-        return res.status(500).json({ success: false, message: 'Database query failed' });
+        return res.status(500).json({ success: false, message: '数据库查询失败' });
       }
       if (!targetUser) {
-        return res.status(404).json({ success: false, message: 'User does not exist' });
+        return res.status(404).json({ success: false, message: '用户不存在' });
       }
       if (targetUser.role !== 'user') {
-        return res.status(403).json({ success: false, message: 'Dept admin can only reset password for regular users' });
+        return res.status(403).json({ success: false, message: '班组管理员只能重置普通用户的密码' });
       }
       if (targetUser.department_id !== currentUserDeptId) {
-        return res.status(403).json({ success: false, message: 'Can only reset password for users in your department' });
+        return res.status(403).json({ success: false, message: '只能重置本班组用户的密码' });
       }
       db.get('SELECT * FROM users WHERE id = ?', [req.user.userId], (err, admin) => {
         if (err) {
-          return res.status(500).json({ success: false, message: 'Database query failed' });
+          return res.status(500).json({ success: false, message: '数据库查询失败' });
         }
         bcrypt.compare(adminPassword, admin.password, (err, isMatch) => {
           if (err) {
-            return res.status(500).json({ success: false, message: 'Verification failed' });
+            return res.status(500).json({ success: false, message: '验证失败' });
           }
           if (!isMatch) {
-            return res.status(401).json({ success: false, message: 'Admin password is incorrect' });
+            return res.status(401).json({ success: false, message: '管理员密码错误' });
           }
           const newPassword = '123456';
           bcrypt.hash(newPassword, 10, (err, hash) => {
             if (err) {
-              return res.status(500).json({ success: false, message: 'Encryption failed' });
+              return res.status(500).json({ success: false, message: '加密失败' });
             }
             db.run('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?', [hash, targetUserId], function(err) {
               if (err) {
-                return res.status(500).json({ success: false, message: 'Update failed' });
+                return res.status(500).json({ success: false, message: '更新失败' });
               }
-              res.json({ success: true, message: 'Password has been reset to 123456, please login again' });
+              res.json({ success: true, message: '密码已重置为123456，请重新登录' });
             });
           });
         });
@@ -430,25 +430,25 @@ router.post('/:id/reset-password', (req, res) => {
   } else {
     db.get('SELECT * FROM users WHERE id = ?', [req.user.userId], (err, admin) => {
       if (err) {
-        return res.status(500).json({ success: false, message: 'Database query failed' });
+        return res.status(500).json({ success: false, message: '数据库查询失败' });
       }
       bcrypt.compare(adminPassword, admin.password, (err, isMatch) => {
         if (err) {
-          return res.status(500).json({ success: false, message: 'Verification failed' });
+          return res.status(500).json({ success: false, message: '验证失败' });
         }
         if (!isMatch) {
-          return res.status(401).json({ success: false, message: 'Admin password is incorrect' });
+          return res.status(401).json({ success: false, message: '管理员密码错误' });
         }
         const newPassword = '123456';
         bcrypt.hash(newPassword, 10, (err, hash) => {
           if (err) {
-            return res.status(500).json({ success: false, message: 'Encryption failed' });
+            return res.status(500).json({ success: false, message: '加密失败' });
           }
           db.run('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?', [hash, targetUserId], function(err) {
             if (err) {
-              return res.status(500).json({ success: false, message: 'Update failed' });
+              return res.status(500).json({ success: false, message: '更新失败' });
             }
-            res.json({ success: true, message: 'Password has been reset to 123456, please login again' });
+            res.json({ success: true, message: '密码已重置为123456，请重新登录' });
           });
         });
       });
@@ -462,40 +462,40 @@ router.put('/:id/status', (req, res) => {
   const currentUserRole = req.user.role;
 
   if (currentUserRole !== 'super_admin' && currentUserRole !== 'dept_admin') {
-    return res.status(403).json({ success: false, message: 'Only admins can operate account status' });
+    return res.status(403).json({ success: false, message: '只有管理员才能操作用户账号状态' });
   }
 
   if (targetUserId === req.user.userId) {
-    return res.status(400).json({ success: false, message: 'Cannot modify your own account status' });
+    return res.status(400).json({ success: false, message: '不能修改自己的账号状态' });
   }
 
   if (!status || !['active', 'disabled'].includes(status)) {
-    return res.status(400).json({ success: false, message: 'Status must be active or disabled' });
+    return res.status(400).json({ success: false, message: '状态必须为正常或停用' });
   }
 
   db.get('SELECT * FROM users WHERE id = ?', [targetUserId], (err, user) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Database query failed' });
+      return res.status(500).json({ success: false, message: '数据库查询失败' });
     }
 
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User does not exist' });
+      return res.status(404).json({ success: false, message: '用户不存在' });
     }
 
     if (user.role === 'super_admin' && status === 'disabled' && req.user.role !== 'super_admin') {
-      return res.status(403).json({ success: false, message: 'Only super admin can disable super admin' });
+      return res.status(403).json({ success: false, message: '只有超级管理员才能禁用超级管理员' });
     }
 
     const tokenVersionUpdate = status === 'disabled' ? ', token_version = token_version + 1' : '';
     db.run(`UPDATE users SET status = ?${tokenVersionUpdate} WHERE id = ?`, [status, targetUserId], function(err) {
       if (err) {
-        return res.status(500).json({ success: false, message: 'Update failed' });
+        return res.status(500).json({ success: false, message: '更新失败' });
       }
 
       if (status === 'disabled') {
-        res.json({ success: true, message: 'Account has been disabled, user will be forced to logout' });
+        res.json({ success: true, message: '账号已停用，用户将被强制登出' });
       } else {
-        res.json({ success: true, message: 'Account has been enabled' });
+        res.json({ success: true, message: '账号已启用' });
       }
     });
   });
@@ -505,38 +505,38 @@ router.post('/:id/change-password', (req, res) => {
   const { oldPassword, newPassword } = req.body;
 
   if (!oldPassword || !newPassword) {
-    return res.status(400).json({ success: false, message: 'Parameters cannot be empty' });
+    return res.status(400).json({ success: false, message: '参数不能为空' });
   }
 
   db.get('SELECT * FROM users WHERE id = ?', [req.params.id], (err, user) => {
     if (err) {
-      return res.status(500).json({ success: false, message: 'Database query failed' });
+      return res.status(500).json({ success: false, message: '数据库查询失败' });
     }
 
     if (!user) {
-      return res.status(404).json({ success: false, message: 'User does not exist' });
+      return res.status(404).json({ success: false, message: '用户不存在' });
     }
 
     bcrypt.compare(oldPassword, user.password, (err, isMatch) => {
       if (err) {
-        return res.status(500).json({ success: false, message: 'Verification failed' });
+        return res.status(500).json({ success: false, message: '验证失败' });
       }
 
       if (!isMatch) {
-        return res.status(401).json({ success: false, message: 'Old password is incorrect' });
+        return res.status(401).json({ success: false, message: '原密码错误' });
       }
 
       bcrypt.hash(newPassword, 10, (err, hash) => {
         if (err) {
-          return res.status(500).json({ success: false, message: 'Encryption failed' });
+          return res.status(500).json({ success: false, message: '加密失败' });
         }
 
         db.run('UPDATE users SET password = ?, token_version = token_version + 1 WHERE id = ?', [hash, req.params.id], function(err) {
           if (err) {
-            return res.status(500).json({ success: false, message: 'Update failed' });
+            return res.status(500).json({ success: false, message: '更新失败' });
           }
 
-          res.json({ success: true, message: 'Password changed successfully, please login again' });
+          res.json({ success: true, message: '密码修改成功，请重新登录' });
         });
       });
     });
